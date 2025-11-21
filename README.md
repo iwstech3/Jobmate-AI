@@ -117,7 +117,7 @@ MIT License.
 
 For questions, feedback, or collaboration opportunities:
 
-* Email: *jobmateai@gmail.com*
+* Email: *jobmateai6@gmail.com*
 * GitHub Issues: Open for feature requests and bug reports
 
 ---
@@ -125,3 +125,4 @@ For questions, feedback, or collaboration opportunities:
 ## ⭐ Support
 
 If you find this project valuable, please consider starring the repository.
+
