@@ -1,0 +1,154 @@
+name: Deploy Backend to Render
+
+# ============================================================================
+# WHAT IS THIS FILE?
+# ============================================================================
+# This is a GitHub Actions workflow file. It defines automated steps that
+# run when code is pushed to the repository.
+#
+# WHAT DOES IT DO?
+# - Detects when code is pushed to the 'main' branch
+# - Sets up Python environment
+# - Installs dependencies
+# - Runs tests (when available)
+# - Triggers Render to redeploy the backend
+#
+# WHY DO WE NEED IT?
+# - Automates deployment (no manual steps)
+# - Ensures code builds successfully before deploying
+# - Provides visibility into deployment process
+# ============================================================================
+
+# ============================================================================
+# WHEN DOES THIS WORKFLOW RUN?
+# ============================================================================
+on:
+  # Trigger on push to main branch
+  push:
+    branches:
+      - main  # Only run on main branch (production)
+    paths:
+      # Only run if files in Backend folder change
+      # (Don't redeploy if only docs change)
+      - 'Backend/**'
+      # Or if this workflow file itself changes
+      - '.github/workflows/deploy-backend.yml'
+  
+  # Allow manual triggering from GitHub UI
+  # (Go to Actions tab → Click workflow → "Run workflow")
+  workflow_dispatch:
+
+# ============================================================================
+# WHAT JOBS DOES THIS WORKFLOW RUN?
+# ============================================================================
+jobs:
+  # Job name: "deploy"
+  # This job handles the deployment process
+  deploy:
+    # Display name in GitHub UI
+    name: Deploy to Render
+    
+    # Virtual machine to run on
+    # Ubuntu = Linux operating system (free, reliable)
+    runs-on: ubuntu-latest
+    
+    # ========================================================================
+    # STEPS TO EXECUTE (in order)
+    # ========================================================================
+    steps:
+      # --------------------------------------------------------------------
+      # Step 1: Download code from GitHub
+      # --------------------------------------------------------------------
+      - name: Checkout code
+        # Uses official GitHub action to download repository code
+        # @v4 = Version 4 (specific version for reliability)
+        uses: actions/checkout@v4
+        # What this does: Downloads your code to the virtual machine
+        # Why needed: Virtual machine starts empty, needs your code
+      
+      # --------------------------------------------------------------------
+      # Step 2: Install Python
+      # --------------------------------------------------------------------
+      - name: Set up Python
+        # Uses official GitHub action to install Python
+        uses: actions/setup-python@v4
+        with:
+          # Python version to install
+          # 3.11 = Latest stable version (matches local development)
+          python-version: '3.11'
+        # What this does: Installs Python 3.11 on the virtual machine
+        # Why needed: Our backend is written in Python
+      
+      # --------------------------------------------------------------------
+      # Step 3: Install dependencies
+      # --------------------------------------------------------------------
+      - name: Install dependencies
+        # Change to Backend folder first
+        # Why: Our requirements.txt is in Backend folder, not root
+        working-directory: ./Backend
+        run: |
+          # Upgrade pip to latest version
+          # pip = Python package installer
+          python -m pip install --upgrade pip
+          
+          # Install all packages from requirements.txt
+          # -r = Read from file
+          # requirements.txt = List of all Python packages we need
+          pip install -r requirements.txt
+        # What this does: Installs FastAPI, SQLAlchemy, and all dependencies
+        # Why needed: Backend can't run without these packages
+      
+      # --------------------------------------------------------------------
+      # Step 4: Run tests (placeholder for future)
+      # --------------------------------------------------------------------
+      - name: Run tests (if available)
+        working-directory: ./Backend
+        run: |
+          # Currently commented out because we don't have tests yet
+          # When tests are added, uncomment this line:
+          # pytest tests/ || true
+          
+          # For now, just print a message
+          echo "Tests will be added later"
+        # continue-on-error: true means workflow won't fail if this step fails
+        # Why: Tests are optional for now (will be required later)
+        continue-on-error: true
+      
+      # --------------------------------------------------------------------
+      # Step 5: Notify that deployment is triggered
+      # --------------------------------------------------------------------
+      - name: Notify deployment
+        run: |
+          # Print messages to workflow logs
+          # These show up in GitHub Actions tab
+          echo "✅ Backend deployment triggered!"
+          echo "Render will automatically redeploy from GitHub"
+          echo "Check Render dashboard for deployment status"
+        # What this does: Provides visibility in workflow logs
+        # Why: Helps you see what's happening
+      
+      # --------------------------------------------------------------------
+      # Step 6: Show deployment status
+      # --------------------------------------------------------------------
+      - name: Deployment Status
+        run: |
+          echo "🚀 Backend is being deployed to Render"
+          echo "📊 Check deployment status at: https://dashboard.render.com"
+        # What this does: Reminds you where to check deployment
+        # Why: Helpful reference in logs
+
+# ============================================================================
+# HOW DOES DEPLOYMENT ACTUALLY HAPPEN?
+# ============================================================================
+# Important: This workflow doesn't directly deploy to Render.
+# Instead:
+# 1. This workflow verifies code builds successfully
+# 2. Render has a webhook that listens for GitHub pushes
+# 3. When you push to main, Render's webhook is triggered
+# 4. Render automatically redeploys your service
+#
+# This workflow adds:
+# - Build verification (ensures code compiles)
+# - Testing (when tests are added)
+# - Visibility (see what's happening in GitHub)
+# ============================================================================

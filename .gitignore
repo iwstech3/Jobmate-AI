@@ -1,0 +1,28 @@
+# Mentor-only files (not for students)
+docs/DEPLOYMENT/LIVE_MEETING_SCRIPT.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
