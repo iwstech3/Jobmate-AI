@@ -1,10 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.endpoints import jobs  # ✅ Import from correct location
+from app.api.v1.endpoints import jobs, documents  # ← Add documents
 from app.database.db import Base, engine
-from app.models import job_post  # Import to register models
+from app.models import job_post, document  # ← Add document
 
-# Create tables (optional if using Alembic)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -18,14 +17,15 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change to specific origins in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include API routers - using the correct one!
-app.include_router(jobs.router, prefix="/api/v1")  # ✅ Correct import
+# Include API routers
+app.include_router(jobs.router, prefix="/api/v1")
+app.include_router(documents.router, prefix="/api/v1")  # ← Add this line
 
 
 @app.get("/")
