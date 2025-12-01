@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from typing import Annotated
+from typing import Annotated, Optional
 import math
 
 from app.database.db import get_db
@@ -35,6 +35,54 @@ def create_job(
     - **description**: Detailed job description (required)
     """
     return crud.create_job_post(db, job_data)
+
+
+@router.get(
+    "/search",
+    response_model=JobPostList,
+    summary="Search and filter job postings"
+)
+def search_jobs(
+    q: Annotated[Optional[str], Query(description="Search keyword")] = None,
+    location: Annotated[Optional[str], Query(description="Filter by location")] = None,
+    job_type: Annotated[Optional[str], Query(description="Filter by job type")] = None,
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 10,
+    db: Annotated[Session, Depends(get_db)] = None
+):
+    """
+    Search and filter job postings with multiple criteria.
+    
+    - **q**: Search keyword (searches in title, company, description)
+    - **location**: Filter by location (partial match, case-insensitive)
+    - **job_type**: Filter by job type (partial match, case-insensitive)
+    - **page**: Page number (starts at 1)
+    - **page_size**: Number of jobs per page (max 100)
+    
+    Examples:
+    - `/jobs/search?q=backend` - Search for "backend"
+    - `/jobs/search?location=Remote` - Filter by remote jobs
+    - `/jobs/search?q=python&location=Remote&job_type=Full-time` - Combined search
+    """
+    skip = (page - 1) * page_size
+    jobs, total = crud.search_job_posts(
+        db, 
+        query=q,
+        location=location,
+        job_type=job_type,
+        skip=skip,
+        limit=page_size
+    )
+    
+    total_pages = math.ceil(total / page_size) if total > 0 else 0
+    
+    return JobPostList(
+        jobs=jobs,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
 
 
 @router.get(

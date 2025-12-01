@@ -43,3 +43,12 @@ class JobPostList(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class JobSearchParams(BaseModel):
+    """Schema for job search parameters"""
+    q: Optional[str] = Field(None, description="Search query (searches title, company, description)")
+    location: Optional[str] = Field(None, description="Filter by location")
+    job_type: Optional[str] = Field(None, description="Filter by job type")
+    page: int = Field(1, ge=1, description="Page number")
+    page_size: int = Field(10, ge=1, le=100, description="Items per page")

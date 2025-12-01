@@ -114,3 +114,65 @@ def delete_job_post(db: Session, job_id: int) -> bool:
     db.delete(db_job)
     db.commit()
     return True
+
+
+def search_job_posts(
+    db: Session,
+    query: Optional[str] = None,
+    location: Optional[str] = None,
+    job_type: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 10
+) -> tuple[list[JobPost], int]:
+    """
+    Search and filter job posts.
+    
+    Args:
+        db: Database session
+        query: Search keyword (searches in title, company, description)
+        location: Filter by location (case-insensitive partial match)
+        job_type: Filter by job type (case-insensitive partial match)
+        skip: Number of records to skip (offset)
+        limit: Maximum number of records to return
+        
+    Returns:
+        Tuple of (list of JobPost objects, total count)
+    """
+    # Start with base query
+    db_query = db.query(JobPost)
+    
+    # Apply keyword search if provided
+    if query:
+        # Case-insensitive search in title, company, and description
+        search_filter = (
+            JobPost.title.ilike(f"%{query}%") |
+            JobPost.company.ilike(f"%{query}%") |
+            JobPost.description.ilike(f"%{query}%")
+        )
+        db_query = db_query.filter(search_filter)
+    
+    # Apply location filter if provided
+    if location:
+        db_query = db_query.filter(JobPost.location.ilike(f"%{location}%"))
+    
+    # Apply job_type filter if provided
+    if job_type:
+        db_query = db_query.filter(JobPost.job_type.ilike(f"%{job_type}%"))
+    
+    # Get total count before pagination
+    total = db_query.count()
+    
+    # Apply ordering and pagination
+    # Order by relevance: exact matches in title first, then by date
+    if query:
+        # Prioritize jobs with query in title
+        db_query = db_query.order_by(
+            JobPost.title.ilike(f"%{query}%").desc(),
+            JobPost.created_at.desc()
+        )
+    else:
+        db_query = db_query.order_by(JobPost.created_at.desc())
+    
+    jobs = db_query.offset(skip).limit(limit).all()
+    
+    return jobs, total
