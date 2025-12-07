@@ -40,6 +40,7 @@ class ParsedCV(Base):
     
     # Relationships
     document = relationship("Document", backref="parsed_cv")
+    analysis = relationship("CVAnalysis", back_populates="parsed_cv", uselist=False)
 
     def __repr__(self):
         return f"<ParsedCV(id={self.id}, name='{self.name}', document_id={self.document_id})>"

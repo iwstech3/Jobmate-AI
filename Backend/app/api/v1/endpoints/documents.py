@@ -272,3 +272,94 @@ async def parse_document(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred: {str(e)}"
         )
+
+
+@router.post(
+    "/{document_id}/analyze",
+    response_model=None,  # Will import CVAnalysisOut
+    status_code=status.HTTP_200_OK,
+    summary="Analyze CV quality and get improvement suggestions"
+)
+async def analyze_cv(
+    document_id: int,
+    db: Annotated[Session, Depends(get_db)]
+):
+    """
+    Analyze a parsed CV and provide quality scores and improvement suggestions.
+    
+    - **document_id**: Document ID
+    
+    Returns comprehensive CV analysis including:
+    - Overall quality score (0-100)
+    - Completeness, quality, and ATS scores
+    - Strengths and weaknesses
+    - Actionable improvement suggestions
+    - Skill and experience analysis
+    
+    **Note**: CV must be parsed first using /documents/{id}/parse
+    """
+    from app.services.ai.cv_analyzer_service import get_cv_analyzer_service
+    from app.crud.parsed_cv import get_parsed_cv_by_document_id
+    from app.crud.cv_analysis import create_cv_analysis, get_cv_analysis_by_parsed_cv_id
+    from app.schemas.cv_analysis import CVAnalysisCreate, CVAnalysisOut, Suggestion, SkillAnalysis, ExperienceAnalysis
+    
+    # 1. Check if document exists
+    document = crud.get_document(db, document_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with id {document_id} not found"
+        )
+    
+    # 2. Check if CV is parsed
+    parsed_cv = get_parsed_cv_by_document_id(db, document_id)
+    if not parsed_cv:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="CV has not been parsed yet. Please parse the document first using /documents/{id}/parse"
+        )
+    
+    # 3. Check if already analyzed (return cached result)
+    existing_analysis = get_cv_analysis_by_parsed_cv_id(db, parsed_cv.id)
+    if existing_analysis:
+        return CVAnalysisOut.from_orm(existing_analysis)
+    
+    # 4. Analyze CV
+    analyzer_service = get_cv_analyzer_service()
+    try:
+        analysis_result = analyzer_service.analyze_cv(parsed_cv)
+        
+        # 5. Convert to Pydantic models for validation
+        suggestions = [Suggestion(**s) for s in analysis_result["suggestions"]]
+        skill_analysis = SkillAnalysis(**analysis_result["skill_analysis"])
+        experience_analysis = ExperienceAnalysis(**analysis_result["experience_analysis"])
+        
+        # 6. Create analysis record
+        analysis_create = CVAnalysisCreate(
+            parsed_cv_id=parsed_cv.id,
+            overall_score=analysis_result["overall_score"],
+            completeness_score=analysis_result["completeness_score"],
+            quality_score=analysis_result["quality_score"],
+            ats_score=analysis_result["ats_score"],
+            strengths=analysis_result["strengths"],
+            weaknesses=analysis_result["weaknesses"],
+            suggestions=suggestions,
+            skill_analysis=skill_analysis,
+            experience_analysis=experience_analysis
+        )
+        
+        db_analysis = create_cv_analysis(db, analysis_create)
+        
+        return CVAnalysisOut.from_orm(db_analysis)
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Analysis failed: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred during analysis: {str(e)}"
+        )
+
