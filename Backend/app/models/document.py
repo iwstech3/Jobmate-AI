@@ -13,7 +13,7 @@ class Document(Base):
     filename = Column(String(255), nullable=False, comment="Original filename")
     stored_filename = Column(String(255), nullable=False, unique=True, comment="Unique filename in storage")
     file_path = Column(String(500), nullable=False, comment="Full path to file")
-    file_type = Column(String(50), nullable=False, comment="MIME type (e.g., application/pdf)")
+    file_type = Column(String(255), nullable=False, comment="MIME type (e.g., application/pdf)")
     file_size = Column(BigInteger, nullable=False, comment="File size in bytes")
     
     # Optional: Link to user when you implement authentication

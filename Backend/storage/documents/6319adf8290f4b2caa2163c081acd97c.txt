@@ -1,0 +1,36 @@
+John Doe
+Email: john.doe@email.com
+Phone: +1-555-0123
+
+PROFESSIONAL SUMMARY
+Experienced Backend Engineer with 5 years of experience in Python, FastAPI, and PostgreSQL. 
+Strong skills in API design, database optimization, and cloud deployment.
+
+SKILLS
+- Python, FastAPI, Django
+- PostgreSQL, MongoDB
+- Docker, Kubernetes
+- REST APIs, Microservices
+- Git, CI/CD
+
+WORK EXPERIENCE
+
+Senior Backend Engineer
+TechCorp Inc. | 2021 - Present
+- Designed and implemented RESTful APIs serving 1M+ users
+- Optimized database queries reducing response time by 40%
+- Led migration to microservices architecture
+
+Backend Developer  
+StartupXYZ | 2019 - 2021
+- Built backend systems using Python and FastAPI
+- Implemented authentication and authorization systems
+- Collaborated with frontend team on API design
+
+EDUCATION
+Bachelor of Science in Computer Science
+University of Technology | 2019
+
+CERTIFICATIONS
+- AWS Certified Solutions Architect
+- Python Professional Certification

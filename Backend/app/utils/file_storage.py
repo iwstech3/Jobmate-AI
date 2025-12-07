@@ -15,7 +15,10 @@ ALLOWED_EXTENSIONS = {
     "pdf": ["application/pdf"],
     "docx": [
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/octet-stream"  # Some browsers send this
+        "application/octet-stream",
+        "application/zip",
+        "application/x-zip-compressed",
+        "application/msword"  # Sometimes misclassified
     ],
     "doc": [
         "application/msword",

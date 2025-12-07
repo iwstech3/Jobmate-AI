@@ -6,6 +6,7 @@ import math
 
 from app.database.db import get_db
 from app.schemas.document import DocumentCreate, DocumentOut, DocumentUploadResponse
+from app.schemas.parsed_cv import ParsedCVOut
 from app.crud import document as crud
 from app.utils import file_storage
 
@@ -195,3 +196,79 @@ def delete_document(
     crud.delete_document(db, document_id)
     
     return None  # 204 No Content
+
+
+@router.post(
+    "/{document_id}/parse",
+    response_model=ParsedCVOut,
+    status_code=status.HTTP_200_OK,
+    summary="Parse a CV/Resume document"
+)
+async def parse_document(
+    document_id: int,
+    db: Annotated[Session, Depends(get_db)]
+):
+    """
+    Parse a document (must be a CV/Resume) and extract structured data.
+    
+    - **document_id**: Document ID
+    
+    Returns structured JSON data extracted from the CV.
+    """
+    from app.services.ai.cv_parser_service import get_cv_parser_service
+    from app.crud.parsed_cv import get_parsed_cv_by_document_id, create_parsed_cv
+    from app.schemas.parsed_cv import ParsedCVCreate, ParsedCVOut
+    from app.utils.file_storage import get_file_path
+    
+    # 1. Check if document exists
+    document = crud.get_document(db, document_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document with id {document_id} not found"
+        )
+        
+    # 2. Check if already parsed (optional: could allow re-parsing)
+    existing_parsed = get_parsed_cv_by_document_id(db, document_id)
+    if existing_parsed:
+        return ParsedCVOut.from_orm(existing_parsed)
+        
+    # 3. Get file path
+    file_path = get_file_path(document.stored_filename)
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Physical file not found"
+        )
+        
+    # 4. Parse document
+    parser_service = get_cv_parser_service()
+    try:
+        # Extract text
+        text = parser_service.extract_text_from_file(str(file_path), document.file_type)
+        
+        # Parse with LLM
+        parsed_data = await parser_service.parse_cv_text(text)
+        
+        # 5. Save to database
+        # Create Pydantic model for validation/creation
+        cv_create = ParsedCVCreate(
+            document_id=document_id,
+            raw_text=text,
+            **parsed_data
+        )
+        
+        db_parsed_cv = create_parsed_cv(db, cv_create)
+        
+        return ParsedCVOut.from_orm(db_parsed_cv)
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Parsing failed: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}"
+        )

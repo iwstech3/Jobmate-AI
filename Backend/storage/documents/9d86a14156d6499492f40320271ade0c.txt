@@ -1,0 +1,24 @@
+
+    John Doe
+    john.doe@example.com
+    +1-555-0100
+    
+    Professional Summary
+    Experienced software engineer with 5 years of experience in Python and cloud technologies.
+    
+    Skills
+    Python, FastAPI, AWS, Docker, PostgreSQL
+    
+    Experience
+    Senior Developer at Tech Corp (2020-Present)
+    - Built scalable microservices using FastAPI.
+    
+    Junior Developer at StartUp Inc (2018-2020)
+    - Maintained legacy Django applications.
+    
+    Education
+    BS Computer Science, University of Technology (2018)
+    
+    Certifications
+    AWS Certified Solutions Architect
+    
