@@ -10,6 +10,7 @@ from app.schemas.job_post import (
     JobPostOut,
     JobPostList
 )
+from app.schemas.job_match import CandidateMatchList
 from app.crud import job_post as crud
 
 router = APIRouter(prefix="/jobs", tags=["Job Posts"])
@@ -324,3 +325,38 @@ async def analyze_job(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred during analysis: {str(e)}"
         )
+
+
+@router.get(
+    "/{job_id}/matching-candidates",
+    response_model=CandidateMatchList,
+    summary="Find matching candidates for a job"
+)
+def find_matching_candidates(
+    job_id: int,
+    limit: Annotated[int, Query(ge=1, le=50, description="Max results")] = 10,
+    min_score: Annotated[float, Query(ge=0.0, le=1.0, description="Minimum match score")] = 0.5,
+    db: Annotated[Session, Depends(get_db)] = None
+):
+    """
+    Find matching candidates for a job using semantic search and rule-based scoring.
+    """
+    from app.services.ai.job_matcher_service import JobMatcherService
+
+    # Check job
+    job = crud.get_job_post(db, job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job post not found."
+        )
+
+    matcher = JobMatcherService()
+    matches = matcher.find_matching_candidates(db, job_id, limit, min_score)
+    
+    return CandidateMatchList(
+        job_id=job_id,
+        matches=matches,
+        count=len(matches)
+    )
+

@@ -24,7 +24,9 @@ class EmbeddingsService:
         Args:
             model_name: Embedding model to use (defaults to env variable)
         """
-        self.model_name = model_name or os.getenv("EMBEDDING_MODEL", "text-embedding-004")
+        self.model_name = model_name or os.getenv("EMBEDDING_MODEL", "models/text-embedding-004")
+        if not self.model_name.startswith("models/") and not self.model_name.startswith("tunedModels/"):
+            self.model_name = f"models/{self.model_name}"
         self.api_key = os.getenv("GEMINI_API_KEY")
         
         if not self.api_key:

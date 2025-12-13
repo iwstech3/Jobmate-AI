@@ -7,6 +7,7 @@ import math
 from app.database.db import get_db
 from app.schemas.document import DocumentCreate, DocumentOut, DocumentUploadResponse
 from app.schemas.parsed_cv import ParsedCVOut
+from app.schemas.job_match import JobMatchList
 from app.crud import document as crud
 from app.utils import file_storage
 
@@ -259,6 +260,59 @@ async def parse_document(
         )
         
         db_parsed_cv = create_parsed_cv(db, cv_create)
+
+        # 6. Generate and store embedding (NEW for matching)
+        try:
+            from app.services.ai.embeddings_service import get_embeddings_service
+            from app.models.document_embedding import DocumentEmbedding
+
+            embeddings_service = get_embeddings_service()
+            
+            # Construct text representation for embedding
+            # We focus on skills, experience, and summary for matching
+            embedding_text = f"Candidate: {parsed_data.get('name', 'Unknown')}\n"
+            embedding_text += f"Skills: {', '.join(parsed_data.get('skills', []))}\n"
+            
+            exp_years = parsed_data.get('experience_years')
+            if exp_years:
+                embedding_text += f"Experience: {exp_years} years\n"
+                
+            summary = parsed_data.get('summary')
+            if summary:
+                embedding_text += f"Summary: {summary}\n"
+                
+            # Latest job title/company if available
+            work_exp = parsed_data.get('work_experience', [])
+            if work_exp and len(work_exp) > 0:
+                latest = work_exp[0]
+                embedding_text += f"Latest Role: {latest.get('title')} at {latest.get('company')}"
+
+            # Generate vector
+            embedding_vector = embeddings_service.embed_document(embedding_text)
+
+            # Check if embedding exists
+            existing_embedding = db.query(DocumentEmbedding).filter(
+                DocumentEmbedding.document_id == document_id
+            ).first()
+
+            if existing_embedding:
+                existing_embedding.embedding = embedding_vector
+                existing_embedding.embedded_text = embedding_text
+            else:
+                doc_embedding = DocumentEmbedding(
+                    document_id=document_id,
+                    embedding=embedding_vector,
+                    embedded_text=embedding_text
+                )
+                db.add(doc_embedding)
+            
+            db.commit()
+
+        except Exception as e:
+            # Log but don't fail the parsing if embedding fails
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to generate embedding for document {document_id}: {str(e)}")
         
         return ParsedCVOut.from_orm(db_parsed_cv)
         
@@ -362,4 +416,41 @@ async def analyze_cv(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred during analysis: {str(e)}"
         )
+
+
+@router.get(
+    "/{document_id}/matching-jobs",
+    response_model=JobMatchList,
+    summary="Find matching jobs for a candidate"
+)
+def find_matching_jobs(
+    document_id: int,
+    limit: Annotated[int, Query(ge=1, le=50, description="Max results")] = 10,
+    min_score: Annotated[float, Query(ge=0.0, le=1.0, description="Minimum match score")] = 0.5,
+    db: Annotated[Session, Depends(get_db)] = None
+):
+    """
+    Find matching jobs for a candidate CV using semantic search and rule-based scoring.
+    """
+    from app.services.ai.job_matcher_service import JobMatcherService
+    from app.crud.parsed_cv import get_parsed_cv_by_document_id
+    from app.schemas.job_match import JobMatchList
+
+    # Check parsed cv
+    parsed_cv = get_parsed_cv_by_document_id(db, document_id)
+    if not parsed_cv:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="CV not parsed or found."
+        )
+
+    matcher = JobMatcherService()
+    matches = matcher.find_matching_jobs(db, parsed_cv.id, limit, min_score)
+    
+    return JobMatchList(
+        document_id=document_id,
+        matches=matches,
+        count=len(matches)
+    )
+
 
