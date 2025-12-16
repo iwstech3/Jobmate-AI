@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -32,8 +32,43 @@ class JobPostOut(JobPostBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
+
+    # Analytics & Tracking
+    views_count: int = 0
+    applications_count: int = 0
+    saves_count: int = 0
+    status: str
+    expires_at: Optional[datetime] = None
+    featured: bool = False
+
     class Config:
         from_attributes = True  # Updated from orm_mode (Pydantic v2)
+
+
+class JobPostStats(BaseModel):
+    """Schema for job statistics"""
+    job_id: int
+    views_count: int
+    applications_count: int
+    saves_count: int
+    views_last_7_days: int
+    applications_last_7_days: int
+    saves_last_7_days: int
+    top_viewer_locations: List[Dict[str, Any]] = []
+
+
+class JobPostAnalytics(BaseModel):
+    """Schema for job analytics overview"""
+    job_id: int
+    job_title: str
+    company: str
+    created_at: datetime
+    total_views: int
+    total_applications: int
+    total_saves: int
+    application_rate: float
+    save_rate: float
+    status: str
 
 
 class JobPostList(BaseModel):

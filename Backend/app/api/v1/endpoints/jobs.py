@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
-from typing import Annotated, Optional
+from typing import Annotated, Optional, List
 import math
 
 from app.database.db import get_db
@@ -8,9 +8,12 @@ from app.schemas.job_post import (
     JobPostCreate,
     JobPostUpdate,
     JobPostOut,
-    JobPostList
+    JobPostList,
+    JobPostStats,
+    JobPostAnalytics
 )
 from app.crud import job_post as crud
+from app.crud import job_analytics as analytics_crud
 
 router = APIRouter(prefix="/jobs", tags=["Job Posts"])
 
@@ -116,6 +119,19 @@ def list_jobs(
         total_pages=total_pages
     )
 
+@router.get(
+    "/trending",
+    response_model=List[JobPostOut],
+    summary="Get trending jobs"
+)
+def get_trending_jobs(
+    limit: Annotated[int, Query(ge=1, le=20)] = 10,
+    db: Annotated[Session, Depends(get_db)] = None
+):
+    """
+    Get trending jobs based on views in the last 7 days.
+    """
+    return analytics_crud.get_trending_jobs(db, limit=limit)
 
 @router.get(
     "/{job_id}",
@@ -124,6 +140,7 @@ def list_jobs(
 )
 def get_job(
     job_id: int,
+    request: Request,
     db: Annotated[Session, Depends(get_db)]
 ):
     """
@@ -133,13 +150,77 @@ def get_job(
     """
     job = crud.get_job_post(db, job_id)
     
-    if not job:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Job post with id {job_id} not found"
-        )
+    
+    # Track view
+    analytics_crud.track_job_view(
+        db=db,
+        job_post_id=job_id,
+        viewer_ip=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        referrer=request.headers.get("referer")
+    )
     
     return job
+    analytics_crud.track_job_view(
+        db=db,
+        job_post_id=job_id,
+        viewer_ip=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        referrer=request.headers.get("referer")
+    )
+    
+    return job
+
+@router.get(
+    "/{job_id}/stats",
+    response_model=JobPostStats,
+    summary="Get statistics for a specific job"
+)
+def get_job_stats(
+    job_id: int,
+    db: Annotated[Session, Depends(get_db)]
+):
+    """
+    Get detailed statistics for a job including views, applications, and saves.
+    """
+    return analytics_crud.get_job_stats(db, job_id)
+
+
+@router.get(
+    "/{job_id}/analytics",
+    response_model=JobPostAnalytics,
+    summary="Get analytics overview for a specific job"
+)
+def get_job_analytics(
+    job_id: int,
+    db: Annotated[Session, Depends(get_db)]
+):
+    """
+    Get analytics overview for a specific job.
+    """
+    stats = analytics_crud.get_job_stats(db, job_id)
+    job = crud.get_job_post(db, job_id)
+    
+    if not job:
+         raise HTTPException(status_code=404, detail="Job not found")
+
+    total_views = job.views_count
+    app_rate = (job.applications_count / total_views) if total_views > 0 else 0.0
+    save_rate = (job.saves_count / total_views) if total_views > 0 else 0.0
+
+    return JobPostAnalytics(
+        job_id=job.id,
+        job_title=job.title,
+        company=job.company,
+        created_at=job.created_at,
+        total_views=job.views_count,
+        total_applications=job.applications_count,
+        total_saves=job.saves_count,
+        application_rate=round(app_rate, 4),
+        save_rate=round(save_rate, 4),
+        status=job.status
+    )
+
 
 
 @router.put(

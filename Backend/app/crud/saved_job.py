@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 from app.models.saved_job import SavedJob
 from app.models.job_post import JobPost
 from app.schemas.saved_job import SavedJobCreate
+from app.crud.job_analytics import increment_saves_count, decrement_saves_count
 
 def save_job(db: Session, save_data: SavedJobCreate) -> SavedJob:
     # 1. Validate Job Exists
@@ -33,6 +34,10 @@ def save_job(db: Session, save_data: SavedJobCreate) -> SavedJob:
     db.add(saved_job)
     db.commit()
     db.refresh(saved_job)
+    
+    # NEW: Increment saves count
+    increment_saves_count(db, save_data.job_post_id)
+    
     return saved_job
 
 def get_saved_job(db: Session, saved_job_id: int) -> Optional[SavedJob]:
@@ -102,6 +107,10 @@ def unsave_job(db: Session, saved_job_id: int, user_email: str) -> bool:
         return False
         
     db.delete(saved_job)
+    
+    # NEW: Decrement saves count
+    decrement_saves_count(db, saved_job.job_post_id)
+    
     db.commit()
     return True
 
@@ -111,5 +120,9 @@ def unsave_job_by_job_id(db: Session, job_post_id: int, user_email: str) -> bool
         return False
         
     db.delete(saved_job)
+    
+    # NEW: Decrement saves count
+    decrement_saves_count(db, saved_job.job_post_id)
+    
     db.commit()
     return True

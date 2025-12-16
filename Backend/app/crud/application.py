@@ -7,6 +7,7 @@ from app.models.application import Application
 from app.models.job_post import JobPost
 from app.models.document import Document
 from app.schemas.application import ApplicationCreate
+from app.crud.job_analytics import increment_applications_count
 
 def create_application(db: Session, application_data: ApplicationCreate) -> Application:
     # 1. Validate Job Exists
@@ -47,6 +48,10 @@ def create_application(db: Session, application_data: ApplicationCreate) -> Appl
     db.add(db_application)
     db.commit()
     db.refresh(db_application)
+    
+    # NEW: Increment application count
+    increment_applications_count(db, application_data.job_post_id)
+    
     return db_application
 
 def get_application(db: Session, application_id: int) -> Optional[Application]:
