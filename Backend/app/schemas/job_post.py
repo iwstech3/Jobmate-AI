@@ -14,7 +14,7 @@ class JobPostBase(BaseModel):
 
 class JobPostCreate(JobPostBase):
     """Schema for creating a new job post"""
-    pass
+    status: Literal["draft", "published"] = "draft"
 
 
 class JobPostUpdate(BaseModel):
@@ -96,6 +96,23 @@ class JobSearchFilters(BaseModel):
     page: int = Field(1, ge=1)
     page_size: int = Field(10, ge=1, le=100)
 
+
+class JobStatusUpdate(BaseModel):
+    """Schema for updating job status"""
+    status: Literal["draft", "published", "closed"]
+    reason: Optional[str] = Field(None, description="Reason for status change (required for closing)")
+
+class JobStatusHistoryOut(BaseModel):
+    """Schema for status history response"""
+    id: int
+    job_post_id: int
+    old_status: str
+    new_status: str
+    changed_reason: Optional[str] = None
+    changed_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 class JobSearchResult(JobPostList):
     """Enhanced search result with filter metadata"""

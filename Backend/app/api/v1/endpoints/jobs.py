@@ -11,11 +11,14 @@ from app.schemas.job_post import (
     JobPostList,
     JobPostStats,
     JobPostAnalytics,
-    JobSearchResult
+    JobSearchResult,
+    JobStatusUpdate,
+    JobStatusHistoryOut
 )
 from app.crud import job_post as crud
 from app.crud import job_analytics as analytics_crud
 from app.crud import job_filters as filters_crud
+from app.crud import job_status as status_crud
 from datetime import datetime
 
 router = APIRouter(prefix="/jobs", tags=["Job Posts"])
@@ -387,3 +390,130 @@ def delete_job(
         )
     
     return None  # 204 No Content
+
+@router.put(
+    "/{job_id}/status",
+    response_model=JobPostOut,
+    summary="Update job status"
+)
+def update_job_status(
+    job_id: int,
+    status_update: JobStatusUpdate,
+    db: Annotated[Session, Depends(get_db)]
+):
+    """
+    Update the status of a job post (draft, published, closed).
+    Requires a reason when closing a job.
+    """
+    job = status_crud.change_job_status(
+        db, 
+        job_id, 
+        status_update.status, 
+        status_update.reason
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+@router.post(
+    "/{job_id}/publish",
+    response_model=JobPostOut,
+    summary="Publish a draft job"
+)
+def publish_job(
+    job_id: int,
+    db: Annotated[Session, Depends(get_db)]
+):
+    """Change job status to published"""
+    job = status_crud.publish_job(db, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+@router.post(
+    "/{job_id}/close",
+    response_model=JobPostOut,
+    summary="Close a job post"
+)
+def close_job(
+    job_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    reason: str = Query(..., description="Reason for closing the job")
+):
+    """Close a job post (requires reason)"""
+    job = status_crud.close_job(db, job_id, reason)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+@router.post(
+    "/{job_id}/reopen",
+    response_model=JobPostOut,
+    summary="Reopen a closed job"
+)
+def reopen_job(
+    job_id: int,
+    db: Annotated[Session, Depends(get_db)]
+):
+    """Reopen a closed job"""
+    job = status_crud.reopen_job(db, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+@router.get(
+    "/{job_id}/status-history",
+    response_model=List[JobStatusHistoryOut],
+    summary="Get job status history"
+)
+def get_job_status_history(
+    job_id: int,
+    db: Annotated[Session, Depends(get_db)]
+):
+    """Get the history of status changes for a job"""
+    # Check if job exists first
+    job = crud.get_job_post(db, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    return status_crud.get_status_history(db, job_id)
+
+@router.get(
+    "/drafts",
+    response_model=JobPostList,
+    summary="Get all draft jobs"
+)
+def get_draft_jobs(
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 10,
+    db: Annotated[Session, Depends(get_db)] = None
+):
+    """Get all jobs with status 'draft'"""
+    jobs, total = status_crud.get_jobs_by_status(db, "draft", (page-1)*page_size, page_size)
+    return JobPostList(
+        jobs=jobs,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=math.ceil(total/page_size) if total > 0 else 0
+    )
+
+@router.get(
+    "/closed",
+    response_model=JobPostList,
+    summary="Get all closed jobs"
+)
+def get_closed_jobs(
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 10,
+    db: Annotated[Session, Depends(get_db)] = None
+):
+    """Get all jobs with status 'closed'"""
+    jobs, total = status_crud.get_jobs_by_status(db, "closed", (page-1)*page_size, page_size)
+    return JobPostList(
+        jobs=jobs,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=math.ceil(total/page_size) if total > 0 else 0
+    )
