@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
 
 
@@ -80,10 +80,24 @@ class JobPostList(BaseModel):
     total_pages: int
 
 
-class JobSearchParams(BaseModel):
-    """Schema for job search parameters"""
-    q: Optional[str] = Field(None, description="Search query (searches title, company, description)")
+class JobSearchFilters(BaseModel):
+    """Schema for advanced job search filters"""
+    q: Optional[str] = Field(None, description="Keyword search")
     location: Optional[str] = Field(None, description="Filter by location")
     job_type: Optional[str] = Field(None, description="Filter by job type")
-    page: int = Field(1, ge=1, description="Page number")
-    page_size: int = Field(10, ge=1, le=100, description="Items per page")
+    company: Optional[str] = Field(None, description="Filter by company")
+    status: Optional[Literal["published", "closed", "draft"]] = "published"
+    sort_by: Optional[Literal["created_at", "views_count", "applications_count", "title", "company"]] = "created_at"
+    sort_order: Optional[Literal["asc", "desc"]] = "desc"
+    is_remote: Optional[bool] = None
+    is_featured: Optional[bool] = None
+    created_after: Optional[datetime] = None
+    created_before: Optional[datetime] = None
+    page: int = Field(1, ge=1)
+    page_size: int = Field(10, ge=1, le=100)
+
+
+class JobSearchResult(JobPostList):
+    """Enhanced search result with filter metadata"""
+    filters_applied: Dict[str, Any]
+    available_filters: Optional[Dict[str, Any]] = None
