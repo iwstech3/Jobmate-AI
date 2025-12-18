@@ -18,6 +18,7 @@ class JobMatchResult(BaseModel):
     missing_skills: List[str] = []
     match_explanation: str
     recommendation: str = Field(..., description="highly_recommended|recommended|potential_fit|not_recommended")
+    compatibility: Optional[Dict[str, Any]] = Field(None, description="Detailed compatibility report")
 
 class JobMatchList(BaseModel):
     """

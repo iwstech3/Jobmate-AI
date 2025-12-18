@@ -11,14 +11,20 @@ from app.models.job_analysis import JobAnalysis
 from app.models.job_embedding import JobEmbedding
 from app.models.document import Document
 
+from app.services.ai.compatibility_scorer_service import get_compatibility_scorer_service
+from app.schemas.job_match import JobMatchList
+
 logger = logging.getLogger(__name__)
 
 class JobMatcherService:
     """
     Service for semantic matching of candidates to jobs and vice versa.
-    Uses vector similarity (via pgvector) and rule-based scoring.
+    Uses vector similarity (via pgvector) and detailed compatibility scoring.
     """
     
+    def __init__(self):
+        self.scorer = get_compatibility_scorer_service()
+
     def find_matching_jobs(self, db: Session, parsed_cv_id: int, limit: int = 10, min_score: float = 0.0) -> List[Dict[str, Any]]:
         """
         Finds the best matching jobs for a specific candidate (ParsedCV).
@@ -78,28 +84,32 @@ class JobMatcherService:
             
             # Skip if vector similarity is too low? (Optional, maybe let overall score decide)
             
-            # 3. Calculate Rule-Based Scores
-            required_skills = row.required_skills if row.required_skills else []
-            min_years = row.min_years_experience
-            max_years = row.max_years_experience
+            # 3. Calculate Detailed Compatibility
+            # Construct ephemeral objects if needed or fetch full models
+            # Here we have partial data in row, but scorer wants schemas/models.
+            # Best to load full objects for the top candidates after vector filter.
             
-            skill_score_data = self._calculate_skill_match(candidate_skills, required_skills)
-            exp_score = self._calculate_experience_match(candidate_experience, min_years, max_years)
+            # For efficiency in this loop, let's just fetch the JobPost and Analysis objects fully for the shortlist
+            job_post = db.query(JobPost).filter(JobPost.id == job_id).first()
+            job_analysis = db.query(JobAnalysis).filter(JobAnalysis.job_post_id == job_id).first()
             
-            # 4. Overall Score
-            overall_score = (
-                similarity_score * 0.4 + 
-                skill_score_data['score'] * 0.4 + 
-                exp_score * 0.2
+            if not job_analysis:
+                 # Skip or use basic scoring if analysis missing
+                 continue
+                 
+            # Convert row data to ParsedCV schema-like object for scorer
+            # (In reality, we should pass the full parsed_cv object fetched earlier)
+            candidate_obj = candidate_data['obj'] # We need to store this in step 1
+            
+            compatibility = self.scorer.calculate_compatibility(
+                parsed_cv=candidate_obj,
+                job_analysis=job_analysis,
+                job_post=job_post,
+                semantic_similarity=similarity_score
             )
             
-            if overall_score < min_score:
+            if compatibility.overall_score < min_score * 100:
                 continue
-            
-            # 5. Recommendation & Explanation
-            match_details = self._generate_match_details(
-                overall_score, skill_score_data, exp_score, candidate_experience, min_years
-            )
             
             matches.append({
                 "job_id": job_id,
@@ -107,14 +117,10 @@ class JobMatcherService:
                 "company": row.company,
                 "location": row.location,
                 "similarity_score": round(similarity_score, 2),
-                "skill_match_score": round(skill_score_data['score'], 2),
-                "experience_match_score": round(exp_score, 2),
-                "overall_match_score": round(overall_score, 2),
-                "match_percentage": int(overall_score * 100),
-                "matched_skills": skill_score_data['matched'],
-                "missing_skills": skill_score_data['missing'],
-                "match_explanation": match_details['explanation'],
-                "recommendation": match_details['recommendation']
+                "compatibility": compatibility.dict(), # Embed full report
+                # Keep legacy fields for backward compat if needed, or remove
+                "overall_match_score": compatibility.overall_score,
+                "match_percentage": compatibility.match_percentage,
             })
             
         # Sort by overall score descending
@@ -224,6 +230,7 @@ class JobMatcherService:
             
         parsed_cv, embedding = result
         return {
+            "obj": parsed_cv, # Return full object
             "embedding": embedding,
             "skills": parsed_cv.skills or [],
             "experience_years": parsed_cv.experience_years
