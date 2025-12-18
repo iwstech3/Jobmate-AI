@@ -6,7 +6,7 @@ from app.database.db import get_db
 from app.schemas.generation import CoverLetterGenerateRequest, CoverLetterResponse, CVSummaryTailorRequest, CVSummaryResponse
 from app.services.ai.generator_service import get_generator_service
 from app.crud.generation import create_cover_letter, get_cover_letter, get_cover_letters
-from app.crud.job_post import get_job
+from app.crud.job_post import get_job_post
 from app.crud.parsed_cv import get_parsed_cv_by_document_id
 
 router = APIRouter(prefix="/generation", tags=["Generation"])
@@ -18,7 +18,7 @@ async def generate_cl(
     generator = Depends(get_generator_service)
 ):
     # 1. Verify Job
-    job = get_job(db, request.job_id)
+    job = get_job_post(db, request.job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
@@ -52,7 +52,7 @@ async def tailor_summary(
     db: Annotated[Session, Depends(get_db)],
     generator = Depends(get_generator_service)
 ):
-    job = get_job(db, request.job_id)
+    job = get_job_post(db, request.job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
         
