@@ -26,3 +26,9 @@ Thumbs.db
 .env
 .env.local
 
+#logs
+storage/documents/*
+storage/temp/*
+!storage/.gitkeep
+!storage/documents/.gitkeep
+!storage/temp/.gitkeep

@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, func, Boolean
+from sqlalchemy.orm import relationship
 from app.database.db import Base
 
 class JobPost(Base):
@@ -26,3 +27,6 @@ class JobPost(Base):
     status = Column(String(50), default="published", nullable=False)  # draft, published, closed
     expires_at = Column(DateTime(timezone=True), nullable=True)
     featured = Column(Boolean, default=False)  # For premium/sponsored listings
+
+    # Relationships
+    analysis = relationship("JobAnalysis", back_populates="job_post", uselist=False)

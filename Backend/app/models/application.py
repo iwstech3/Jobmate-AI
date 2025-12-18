@@ -1,3 +1,4 @@
+import sqlalchemy as sa
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, func, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database.db import Base
@@ -13,6 +14,9 @@ class Application(Base):
     cv_document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
     cover_letter_document_id = Column(Integer, ForeignKey("documents.id"), nullable=True)
     status = Column(String(50), nullable=False, default="pending", index=True) # pending, reviewed, shortlisted, rejected, accepted
+    external_url = Column(String(500), nullable=True)
+    automation_status = Column(String(50), nullable=False, default="not_started") # not_started, pending, manual_action, completed, failed
+    application_data = Column(sa.JSON, nullable=True) # Snapshot of data used for application
     applied_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
     hr_notes = Column(Text, nullable=True)

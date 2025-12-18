@@ -22,6 +22,9 @@ class ApplicationOut(ApplicationBase):
     cv_document_id: int
     cover_letter_document_id: Optional[int] = None
     status: str
+    external_url: Optional[str] = None
+    automation_status: str
+    application_data: Optional[dict] = None
     applied_at: datetime
     reviewed_at: Optional[datetime] = None
     hr_notes: Optional[str] = None
@@ -55,3 +58,6 @@ class ApplicationStats(BaseModel):
     shortlisted: int = 0
     rejected: int = 0
     accepted: int = 0
+class ApplicationAutomationUpdate(BaseModel):
+    automation_status: Literal["not_started", "pending", "manual_action", "completed", "failed"]
+    application_data: Optional[dict] = None

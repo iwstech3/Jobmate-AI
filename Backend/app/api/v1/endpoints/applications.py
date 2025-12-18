@@ -3,13 +3,15 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.database.db import get_db
+from app.services.automation.app_tracker_service import ApplicationTrackerService
 from app.schemas.application import (
     ApplicationCreate, 
     ApplicationOut, 
     ApplicationList, 
     ApplicationUpdate,
     ApplicationWithDetails,
-    ApplicationStats
+    ApplicationStats,
+    ApplicationAutomationUpdate
 )
 from app.crud import application as crud_application
 
@@ -184,3 +186,33 @@ def get_job_applications(
         status=status, 
         db=db
     )
+
+@router.post("/{application_id}/prepare-automation", response_model=dict)
+async def prepare_automation(
+    application_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Gather and snapshot data for an application to be submitted externally.
+    """
+    service = ApplicationTrackerService(db)
+    try:
+        data = await service.prepare_application_data(application_id)
+        return data
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@router.put("/{application_id}/automation-status", response_model=ApplicationOut)
+def update_automation_status(
+    application_id: int,
+    status_update: ApplicationAutomationUpdate,
+    db: Session = Depends(get_db)
+):
+    """
+    Update the automation status of an application.
+    """
+    service = ApplicationTrackerService(db)
+    updated_app = service.update_automation_status(application_id, status_update.automation_status)
+    if not updated_app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    return updated_app
