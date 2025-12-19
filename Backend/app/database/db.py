@@ -10,19 +10,23 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# Render specific optimizations
+# Render specifics: force SSL and avoid fork issues
 connect_args = {}
-if "render.com" in DATABASE_URL or "internal" in DATABASE_URL:
-    # Internal Render connections often prefer or require specific SSL handling
-    # If the decryption error persists, we might need sslmode=disable here for internal
-    connect_args["sslmode"] = "prefer"
+if DATABASE_URL and ("render.com" in DATABASE_URL or "internal" in DATABASE_URL):
+    # Force use of SSL
+    if "sslmode=" not in DATABASE_URL:
+        separator = "&" if "?" in DATABASE_URL else "?"
+        DATABASE_URL += f"{separator}sslmode=require"
+    connect_args["sslmode"] = "require"
+
+# Using NullPool on Render is the safest way to avoid the "decryption failed" SSL error
+# which occurs when connections are shared between worker processes.
+from sqlalchemy.pool import NullPool
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,
-    pool_recycle=300,  # More aggressive recycle for cloud databases
-    pool_size=5,       # Lower pool size to stay within free tier limits
-    max_overflow=10,
+    echo=True,  # Log SQL for easier debugging
+    poolclass=NullPool if (DATABASE_URL and "render.com" in DATABASE_URL) else None,
     connect_args=connect_args
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

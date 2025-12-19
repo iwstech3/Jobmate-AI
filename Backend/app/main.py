@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
         with engine.connect() as conn:
             logger.info("Database connection verified.")
             
+        logger.info(f"Registered models: {list(Base.metadata.tables.keys())}")
         logger.info("Creating tables if they don't exist...")
         Base.metadata.create_all(bind=engine)
         logger.info("Database initialized successfully.")
