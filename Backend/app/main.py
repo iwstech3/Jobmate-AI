@@ -24,9 +24,12 @@ async def lifespan(app: FastAPI):
         # Dispose of any engine connection created during import/fork phase
         engine.dispose()
         
-        # Verify connection before creating tables
+        # Verify connection and enable pgvector
         with engine.connect() as conn:
-            logger.info("Database connection verified.")
+            from sqlalchemy import text
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            conn.commit()
+            logger.info("Database connection verified and pgvector extension enabled.")
             
         logger.info(f"Registered models: {list(Base.metadata.tables.keys())}")
         logger.info("Creating tables if they don't exist...")
